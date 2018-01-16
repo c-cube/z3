@@ -1,4 +1,5 @@
-; expect: sat
+
+; expect: unsat
 
 (set-logic ALL)
 (set-option :produce-proofs true)
@@ -30,7 +31,8 @@
 (declare-const l_1 list)
 
 (assert (= l_1 (rev l_1)))
-(assert (= (size l_1) 3))
-(assert (= (sum l_1) 4))
+(assert (= (size l_1) 4))
+(assert (= (sum l_1) 5))
 (check-sat)
-(get-model)
+(get-proof-graph)
+
