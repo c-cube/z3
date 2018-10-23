@@ -83,6 +83,7 @@ namespace smt {
         svector<stack_entry>  m_stack; // stack for DFS for occurs_check
 
         void oc_mark_on_stack(enode * n);
+        void oc_unmark_on_stack(enode * n);
         bool oc_on_stack(enode * n) const { return n->get_root()->is_marked(); }
 
         void oc_mark_cycle_free(enode * n);

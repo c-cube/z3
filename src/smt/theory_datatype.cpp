@@ -45,7 +45,10 @@ namespace smt {
     }
 
     theory_datatype::final_check_st::~final_check_st() {
-        unmark_enodes(th->m_to_unmark.size(), th->m_to_unmark.c_ptr());
+        // note: some of these have been unmarked already, so we can't just call `unmark_enodes`
+        for (auto* e : th->m_to_unmark) {
+            if (e->is_marked()) e->unset_mark();
+        }
         unmark_enodes2(th->m_to_unmark2.size(), th->m_to_unmark2.c_ptr());
         th->m_to_unmark.reset();
         th->m_to_unmark2.reset();
@@ -57,7 +60,12 @@ namespace smt {
     void theory_datatype::oc_mark_on_stack(enode * n) {
         n = n->get_root();
         n->set_mark();
-        m_to_unmark.push_back(n); 
+        m_to_unmark.push_back(n);  // NOTE: should not be necessary?
+    }
+
+    void theory_datatype::oc_unmark_on_stack(enode * n) {
+        n = n->get_root();
+        n->unset_mark();
     }
 
     void theory_datatype::oc_mark_cycle_free(enode * n) {
@@ -460,9 +468,14 @@ namespace smt {
     void theory_datatype::occurs_check_explain(enode * app, enode * root) {
         TRACE("datatype", tout << "occurs_check_explain " << mk_bounded_pp(app->get_owner(), get_manager()) << " <-> " << mk_bounded_pp(root->get_owner(), get_manager()) << "\n";);
         enode* app_parent = nullptr;
+        enode* app_cstor = oc_get_cstor(app);
 
-        // first: explain that root=v, given that app=cstor(...,v,...)
-        for (enode * arg : enode::args(oc_get_cstor(app))) {
+        // explain that app=cstor(...)
+        if (app != app_cstor)
+            m_used_eqs.push_back(enode_pair(app, app_cstor));
+
+        // explain that root=v, given that app=cstor(...,v,...)
+        for (enode * arg : enode::args(app_cstor)) {
             // found an argument which is equal to root
             if (arg->get_root() == root->get_root()) {
                 if (arg != root)
@@ -473,7 +486,7 @@ namespace smt {
 
         // now explain app=cstor(..,v,..) where v=root, and recurse with parent of app
         while (app->get_root() != root->get_root()) {
-            enode * app_cstor = oc_get_cstor(app);
+            app_cstor = oc_get_cstor(app);
             if (app != app_cstor)
                 m_used_eqs.push_back(enode_pair(app, app_cstor));
             app_parent = m_parent[app->get_root()];
@@ -543,6 +556,7 @@ namespace smt {
               break;
 
             case EXIT:
+              oc_unmark_on_stack(app); // not on stack anymore
               oc_mark_cycle_free(app);
               break;
             }
